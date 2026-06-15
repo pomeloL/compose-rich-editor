@@ -1468,12 +1468,13 @@ public class RichTextState internal constructor(
         paragraph: RichParagraph,
         newType: ParagraphType,
         textFieldValue: TextFieldValue,
+        adjustTextFieldValueOffset: Boolean = false,
     ): TextFieldValue {
         val selection = textFieldValue.selection
         val paragraphOldStartTextLength = paragraph.type.startText.length
         val textFieldValueDiff = this.textFieldValue.text.length - textFieldValue.text.length
         val firstNonEmptyChildIndex = paragraph.getFirstNonEmptyChild()?.textRange?.min?.let {
-            if (it >= selection.min)
+            if (adjustTextFieldValueOffset || it >= selection.min)
                 it - textFieldValueDiff
             else
                 it
@@ -4023,6 +4024,7 @@ public class RichTextState internal constructor(
                         initialLevel = type.level
                     ),
                     textFieldValue = tempTextFieldValue,
+                    adjustTextFieldValueOffset = true,
                 )
 
                 type.number = orderedListNumber
