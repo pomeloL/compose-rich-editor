@@ -2,9 +2,18 @@ plugins {
     id("io.github.gradle-nexus.publish-plugin")
 }
 
+val publicationGroup = providers.gradleProperty("publishedGroup").orNull
+    ?: providers.gradleProperty("group").orNull
+    ?: "com.mohamedrejeb.richeditor"
+
+val publicationVersion = providers.gradleProperty("publishedVersion").orNull
+    ?: providers.gradleProperty("version").orNull
+    ?: System.getenv("VERSION")
+    ?: "1.0.0-rc13"
+
 allprojects {
-    group = "com.mohamedrejeb.richeditor"
-    version = System.getenv("VERSION") ?: "1.0.0-rc13"
+    group = publicationGroup
+    version = publicationVersion
 }
 
 nexusPublishing {

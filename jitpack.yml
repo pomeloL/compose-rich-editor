@@ -1,0 +1,4 @@
+jdk:
+  - openjdk17
+install:
+  - ./gradlew clean :richeditor-compose:publishKotlinMultiplatformPublicationToMavenLocal :richeditor-compose:publishAndroidReleasePublicationToMavenLocal -PpublishedGroup=com.github.pomeloL.compose-rich-editor -PpublishedVersion=$(git rev-parse HEAD) -x test -x lint
