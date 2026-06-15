@@ -17,6 +17,7 @@ internal class UnorderedList private constructor(
     startTextWidth: TextUnit = 0.sp,
     initialLevel: Int = 1,
     initialStyleType: UnorderedListStyleType = DefaultUnorderedListStyleType,
+    initialPrefixAlignment: ListPrefixAlignment = ListPrefixAlignment.End,
 ): ParagraphType, ConfigurableStartTextWidth, ConfigurableListLevel {
 
     constructor(
@@ -33,6 +34,7 @@ internal class UnorderedList private constructor(
         initialIndent = config.unorderedListIndent,
         initialLevel = initialLevel,
         initialStyleType = config.unorderedListStyleType,
+        initialPrefixAlignment = config.listPrefixAlignment,
     )
 
     override var startTextWidth: TextUnit = startTextWidth
@@ -60,6 +62,12 @@ internal class UnorderedList private constructor(
             startRichSpan = getNewStartRichSpan()
         }
 
+    private var prefixAlignment = initialPrefixAlignment
+        set(value) {
+            field = value
+            style = getNewParagraphStyle()
+        }
+
     private var style: ParagraphStyle =
         getNewParagraphStyle()
 
@@ -72,16 +80,24 @@ internal class UnorderedList private constructor(
             styleType = config.unorderedListStyleType
         }
 
+        if (config.listPrefixAlignment != prefixAlignment) {
+            prefixAlignment = config.listPrefixAlignment
+        }
+
         return style
     }
 
-    private fun getNewParagraphStyle() =
-        ParagraphStyle(
+    private fun getNewParagraphStyle(): ParagraphStyle {
+        val base = (indent * level).toFloat()
+        val prefix = startTextWidth.value
+        val useEnd = prefixAlignment == ListPrefixAlignment.End && base >= prefix
+        return ParagraphStyle(
             textIndent = TextIndent(
-                firstLine = (indent * level).sp,
-                restLine = ((indent * level) + startTextWidth.value).sp
+                firstLine = if (useEnd) (base - prefix).sp else base.sp,
+                restLine = if (useEnd) base.sp else (base + prefix).sp
             )
         )
+    }
 
     @OptIn(ExperimentalRichTextApi::class)
     override var startRichSpan: RichSpan =
@@ -114,6 +130,7 @@ internal class UnorderedList private constructor(
             startTextWidth = startTextWidth,
             initialLevel = level,
             initialStyleType = styleType,
+            initialPrefixAlignment = prefixAlignment,
         )
 
     override fun copy(): ParagraphType =
@@ -122,6 +139,7 @@ internal class UnorderedList private constructor(
             startTextWidth = startTextWidth,
             initialLevel = level,
             initialStyleType = styleType,
+            initialPrefixAlignment = prefixAlignment,
         )
 
     override fun equals(other: Any?): Boolean {
@@ -132,6 +150,7 @@ internal class UnorderedList private constructor(
         if (startTextWidth != other.startTextWidth) return false
         if (level != other.level) return false
         if (styleType != other.styleType) return false
+        if (prefixAlignment != other.prefixAlignment) return false
 
         return true
     }
@@ -141,6 +160,7 @@ internal class UnorderedList private constructor(
         result = 31 * result + startTextWidth.hashCode()
         result = 31 * result + level
         result = 31 * result + styleType.hashCode()
+        result = 31 * result + prefixAlignment.hashCode()
         return result
     }
 }
