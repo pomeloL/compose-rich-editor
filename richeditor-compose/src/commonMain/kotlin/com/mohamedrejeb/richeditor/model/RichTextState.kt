@@ -64,6 +64,19 @@ public class RichTextState internal constructor(
     internal val usedInlineContentMapKeys = mutableSetOf<String>()
 
     /**
+     * The most recent non-collapsed selection. Android may collapse the current selection before
+     * dispatching the clipboard write, so copy operations need this value as a fallback.
+     */
+    internal var lastNonCollapsedSelection: TextRange = TextRange.Zero
+
+    internal val copySelection: TextRange?
+        get() = when {
+            !selection.collapsed -> selection
+            !lastNonCollapsedSelection.collapsed -> lastNonCollapsedSelection
+            else -> null
+        }
+
+    /**
      * The annotated string representing the rich text.
      */
     public var annotatedString: AnnotatedString by mutableStateOf(AnnotatedString(text = ""))
@@ -1559,6 +1572,10 @@ public class RichTextState internal constructor(
         if (!singleParagraphMode) {
             // Check for paragraphs
             checkForParagraphs()
+        }
+
+        if (!tempTextFieldValue.selection.collapsed) {
+            lastNonCollapsedSelection = tempTextFieldValue.selection
         }
 
         if (
@@ -4036,6 +4053,85 @@ public class RichTextState internal constructor(
         updateTextFieldValue()
     }
 
+    private fun extractRangeState(range: TextRange): RichTextState {
+        val textLength = annotatedString.text.length
+        val rangeStart = range.min.coerceIn(0, textLength)
+        val rangeEnd = range.max.coerceIn(0, textLength)
+
+        if (rangeStart >= rangeEnd) {
+            return RichTextState(listOf(RichParagraph()))
+        }
+
+        val resultParagraphs = mutableListOf<RichParagraph>()
+
+        for ((index, paragraph) in richParagraphList.withIndex()) {
+            val startTextLength = paragraph.type.startText.length
+            val paragraphStart = paragraph.type.startRichSpan.textRange.min
+            val contentStart = paragraphStart + startTextLength
+            val contentEnd = paragraph.children.lastOrNull()?.fullTextRange?.max ?: contentStart
+            val paragraphEnd = contentEnd + if (index < richParagraphList.lastIndex) 1 else 0
+
+            if (paragraphEnd <= rangeStart || contentStart >= rangeEnd) continue
+
+            if (contentEnd <= rangeStart && rangeStart < paragraphEnd) {
+                resultParagraphs.add(RichParagraph())
+                continue
+            }
+
+            val newParagraph = paragraph.copy()
+            trimSpanList(
+                spans = newParagraph.children,
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
+            )
+            newParagraph.removeEmptyChildren()
+            resultParagraphs.add(newParagraph)
+        }
+
+        if (resultParagraphs.isEmpty()) {
+            resultParagraphs.add(RichParagraph())
+        }
+
+        return RichTextState(resultParagraphs)
+    }
+
+    @OptIn(ExperimentalRichTextApi::class)
+    private fun trimSpanList(
+        spans: MutableList<RichSpan>,
+        rangeStart: Int,
+        rangeEnd: Int,
+    ) {
+        val indicesToRemove = mutableListOf<Int>()
+
+        for (index in spans.indices) {
+            val span = spans[index]
+            val spanStart = span.textRange.min
+            val spanEnd = span.textRange.max
+
+            if (spanEnd <= rangeStart || spanStart >= rangeEnd) {
+                span.text = ""
+            } else if (spanStart < rangeStart || spanEnd > rangeEnd) {
+                val trimStart = (rangeStart - spanStart).coerceAtLeast(0)
+                val trimEnd = (rangeEnd - spanStart).coerceAtMost(span.text.length)
+                span.text = span.text.substring(trimStart, trimEnd)
+            }
+
+            trimSpanList(span.children, rangeStart, rangeEnd)
+
+            if (
+                span.text.isEmpty() &&
+                span.children.isEmpty() &&
+                span.richSpanStyle !is RichSpanStyle.Image
+            ) {
+                indicesToRemove.add(index)
+            }
+        }
+
+        for (index in indicesToRemove.asReversed()) {
+            spans.removeAt(index)
+        }
+    }
+
     /**
      * Returns the [RichTextState] as a text string.
      *
@@ -4043,6 +4139,10 @@ public class RichTextState internal constructor(
      */
     public fun toText(): String =
         toText(richParagraphList = richParagraphList)
+
+    /** Returns the selected range as plain text while preserving paragraph breaks. */
+    public fun toText(range: TextRange): String =
+        extractRangeState(range).toText()
 
     /**
      * Decodes the [RichTextState] to a html string.
@@ -4052,6 +4152,10 @@ public class RichTextState internal constructor(
     public fun toHtml(): String {
         return RichTextStateHtmlParser.decode(this)
     }
+
+    /** Returns the selected range as HTML while preserving rich span and paragraph styles. */
+    public fun toHtml(range: TextRange): String =
+        RichTextStateHtmlParser.decode(extractRangeState(range))
 
     /**
      * Decodes the [RichTextState] to a markdown string.
