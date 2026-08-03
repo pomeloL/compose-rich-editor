@@ -2,7 +2,6 @@ package com.mohamedrejeb.richeditor.ui
 
 import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.text.BasicTextField
@@ -214,27 +213,6 @@ public fun BasicRichTextEditor(
 
     LaunchedEffect(singleParagraph) {
         state.singleParagraphMode = singleParagraph
-    }
-
-    if (!singleParagraph) {
-        // Workaround for Android to fix a bug in BasicTextField where it doesn't select the correct text
-        // when the text contains multiple paragraphs.
-        LaunchedEffect(interactionSource) {
-            interactionSource.interactions.collect { interaction ->
-                if (interaction is PressInteraction.Press) {
-                    val pressPosition = interaction.pressPosition
-                    val topPadding = with(density) { contentPadding.calculateTopPadding().toPx() }
-                    val startPadding = with(density) { contentPadding.calculateStartPadding(layoutDirection).toPx() }
-
-                    adjustTextIndicatorOffset(
-                        pressPosition = pressPosition,
-                        state = state,
-                        topPadding = topPadding,
-                        startPadding = startPadding,
-                    )
-                }
-            }
-        }
     }
 
     CompositionLocalProvider(
