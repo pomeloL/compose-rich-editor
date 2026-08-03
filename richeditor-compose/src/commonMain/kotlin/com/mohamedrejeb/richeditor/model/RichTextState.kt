@@ -3431,6 +3431,26 @@ public class RichTextState internal constructor(
             else
                 (nextParagraph.getFirstNonEmptyChild() ?: nextParagraph.type.startRichSpan)
                     .textRange.min.minus(nextParagraph.type.startText.length)
+        val selectionAtParagraphStart =
+            if (!selection.collapsed)
+                false
+            else
+                richParagraphList
+                    .asSequence()
+                    .drop(1)
+                    .any { paragraph ->
+                        val firstChild =
+                            paragraph.getFirstNonEmptyChild() ?: paragraph.type.startRichSpan
+                        firstChild.textRange.min - paragraph.type.startText.length == selection.min
+                    }
+        val paragraphStartX =
+            if (selectionAtParagraphStart)
+                textLayoutResult.getHorizontalPosition(
+                    offset = selection.min.coerceIn(0, textLength),
+                    usePrimaryDirection = true,
+                )
+            else
+                0f
 
         // Handle selection adjustments
         if (
@@ -3442,6 +3462,23 @@ public class RichTextState internal constructor(
                     selection = TextRange(
                         (selection.min - 1).coerceAtLeast(0),
                         (selection.min - 1).coerceAtLeast(0)
+                    )
+                )
+            )
+        } else if (
+            selectionAtParagraphStart &&
+            pressX > paragraphStartX + 2f
+        ) {
+            // The legacy BasicTextField can report the next paragraph start when the user taps
+            // after the previous line's last character. The vertical press coordinate does not
+            // include the field's internal scroll offset, so the paragraph lookup above becomes
+            // unreliable after scrolling. The horizontal position still distinguishes that tap
+            // from an intentional tap at the beginning of the next paragraph.
+            updateTextFieldValue(
+                textFieldValue.copy(
+                    selection = TextRange(
+                        (selection.min - 1).coerceAtLeast(0),
+                        (selection.min - 1).coerceAtLeast(0),
                     )
                 )
             )
