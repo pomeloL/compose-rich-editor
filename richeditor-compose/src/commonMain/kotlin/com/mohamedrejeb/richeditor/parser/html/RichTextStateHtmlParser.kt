@@ -45,7 +45,8 @@ internal object RichTextStateHtmlParser : RichTextStateParser<String> {
                 val addedText = KsoupEntities.decodeHtml(
                     removeHtmlTextExtraSpaces(
                         input = it,
-                        trimStart = stringBuilder.lastOrNull() == null || stringBuilder.lastOrNull()?.isWhitespace() == true || stringBuilder.lastOrNull() == '\n',
+                        trimStart = stringBuilder.lastOrNull() == null ||
+                            stringBuilder.lastOrNull()?.isCollapsibleHtmlWhitespace() == true,
                     )
                 )
 

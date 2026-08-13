@@ -492,7 +492,7 @@ class RichTextStateHtmlParserDecodeTest {
         val richTextState = RichTextStateHtmlParser.encode(html)
 
         assertEquals(
-            "results in the Horizon-School",
+            "results in the\u00A0Horizon-School",
             richTextState.annotatedString.text
         )
     }

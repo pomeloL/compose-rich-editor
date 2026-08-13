@@ -8,15 +8,19 @@ package com.mohamedrejeb.richeditor.parser.html
  */
 internal fun removeHtmlTextExtraSpaces(input: String, trimStart: Boolean = false): String {
     return input
-        .replace(' ', ' ')
         .replace('\n', ' ')
-        .replace("\\s+".toRegex(), " ")
+        .replace("[\\u0009\\u000B\\u000C\\u000D ]+".toRegex(), " ")
         .let {
             if (trimStart)
-                it.trimStart()
+                it.trimStart(Char::isCollapsibleHtmlWhitespace)
             else
                 it
         }
+}
+
+internal fun Char.isCollapsibleHtmlWhitespace(): Boolean {
+    return this == ' ' || this == '\t' || this == '\n' || this == '\u000B' ||
+        this == '\u000C' || this == '\r'
 }
 
 /**

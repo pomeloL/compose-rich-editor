@@ -25,6 +25,16 @@ class RichTextStateHtmlParserEncodeTest {
         )
     }
 
+    @Test
+    fun testPreserveNonBreakingSpaces() {
+        val html = "<p>Hello&nbsp;&nbsp; World</p>"
+
+        val richTextState = RichTextStateHtmlParser.encode(html)
+
+        assertEquals("Hello\u00A0\u00A0 World", richTextState.annotatedString.text)
+        assertEquals(html, richTextState.toHtml())
+    }
+
     @OptIn(ExperimentalRichTextApi::class)
     @Test
     fun testHtmlWithImage() {
