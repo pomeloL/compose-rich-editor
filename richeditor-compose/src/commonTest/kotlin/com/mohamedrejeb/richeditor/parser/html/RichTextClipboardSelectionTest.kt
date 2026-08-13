@@ -1,6 +1,7 @@
 package com.mohamedrejeb.richeditor.parser.html
 
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -43,5 +44,46 @@ class RichTextClipboardSelectionTest {
         assertTrue(html.contains("<li>Item 10</li>"))
         assertTrue(html.contains("<li>Item 14</li>"))
         assertEquals(state.toHtml(), html)
+    }
+
+    @Test
+    fun selectionSnapshotRemainsAvailableAfterSelectionCollapses() {
+        val state = RichTextStateHtmlParser.encode(
+            "<p>Before <strong>cut text</strong> after</p>"
+        )
+        val start = state.annotatedString.text.indexOf("cut text")
+        val selection = TextRange(start, start + "cut text".length)
+
+        state.selection = selection
+        state.selection = TextRange(selection.min)
+
+        assertEquals("cut text", state.clipboardSelectionSnapshot()?.plainText)
+        assertEquals(
+            "<p><b>cut text</b></p>",
+            state.clipboardSelectionSnapshot()?.htmlText,
+        )
+    }
+
+    @Test
+    fun selectionSnapshotRemainsAvailableAfterSelectedTextIsRemoved() {
+        val state = RichTextStateHtmlParser.encode(
+            "<p>Before <strong>cut text</strong> after</p>"
+        )
+        val start = state.annotatedString.text.indexOf("cut text")
+        val selection = TextRange(start, start + "cut text".length)
+
+        state.selection = selection
+        state.onTextFieldValueChange(
+            TextFieldValue(
+                text = state.annotatedString.text.removeRange(selection.min, selection.max),
+                selection = TextRange(selection.min),
+            )
+        )
+
+        assertEquals("cut text", state.clipboardSelectionSnapshot()?.plainText)
+        assertEquals(
+            "<p><b>cut text</b></p>",
+            state.clipboardSelectionSnapshot()?.htmlText,
+        )
     }
 }

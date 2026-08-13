@@ -24,16 +24,18 @@ private class AndroidRichTextClipboard(
             return
         }
 
-        val selection = richTextState.copySelection
-        if (selection == null || selection.collapsed) {
+        val selectionSnapshot = richTextState.clipboardSelectionSnapshot()
+        if (selectionSnapshot == null) {
             clipboard.setClipEntry(clipEntry)
             return
         }
 
         runCatching {
-            val plainText = richTextState.toText(selection)
-            val htmlText = richTextState.toHtml(selection)
-            val richClipData = ClipData.newHtmlText("rich text", plainText, htmlText)
+            val richClipData = ClipData.newHtmlText(
+                "rich text",
+                selectionSnapshot.plainText,
+                selectionSnapshot.htmlText,
+            )
             clipboard.setClipEntry(ClipEntry(richClipData))
         }.getOrElse {
             clipboard.setClipEntry(clipEntry)

@@ -76,6 +76,42 @@ public class RichTextState internal constructor(
             else -> null
         }
 
+    internal data class ClipboardSelectionSnapshot(
+        val selection: TextRange,
+        val plainText: String,
+        val htmlText: String,
+    )
+
+    /**
+     * Keeps the selected content available after a cut collapses the selection and removes it from
+     * the editor. Clipboard writes are asynchronous on newer Compose versions, so reading the
+     * current state when the write runs can otherwise produce an empty clip.
+     */
+    private var lastRemovedSelectionSnapshot: ClipboardSelectionSnapshot? = null
+
+    internal fun clipboardSelectionSnapshot(): ClipboardSelectionSnapshot? {
+        val availableSelection = when {
+            !selection.collapsed -> selection
+            !lastNonCollapsedSelection.collapsed &&
+                lastNonCollapsedSelection.max <= annotatedString.length ->
+                lastNonCollapsedSelection
+            else -> null
+        }
+
+        return availableSelection?.let(::createClipboardSelectionSnapshot)
+            ?: lastRemovedSelectionSnapshot
+    }
+
+    private fun createClipboardSelectionSnapshot(
+        selection: TextRange,
+    ): ClipboardSelectionSnapshot {
+        return ClipboardSelectionSnapshot(
+            selection = selection,
+            plainText = toText(selection),
+            htmlText = toHtml(selection),
+        )
+    }
+
     /**
      * The annotated string representing the rich text.
      */
@@ -1540,6 +1576,16 @@ public class RichTextState internal constructor(
      * @param newTextFieldValue the new text field value.
      */
     internal fun onTextFieldValueChange(newTextFieldValue: TextFieldValue) {
+        if (
+            newTextFieldValue.text.length < textFieldValue.text.length &&
+            !textFieldValue.selection.collapsed
+        ) {
+            lastRemovedSelectionSnapshot = createClipboardSelectionSnapshot(
+                textFieldValue.selection
+            )
+            lastNonCollapsedSelection = TextRange.Zero
+        }
+
         tempTextFieldValue = newTextFieldValue
 
         if (tempTextFieldValue.text.length > textFieldValue.text.length)
@@ -1574,10 +1620,6 @@ public class RichTextState internal constructor(
             checkForParagraphs()
         }
 
-        if (!tempTextFieldValue.selection.collapsed) {
-            lastNonCollapsedSelection = tempTextFieldValue.selection
-        }
-
         if (
             tempTextFieldValue.text == textFieldValue.text &&
             tempTextFieldValue.selection != textFieldValue.selection
@@ -1587,6 +1629,10 @@ public class RichTextState internal constructor(
         } else {
             // Update the annotatedString and the textFieldValue with the new values
             updateAnnotatedString(tempTextFieldValue)
+        }
+
+        if (!textFieldValue.selection.collapsed) {
+            lastNonCollapsedSelection = textFieldValue.selection
         }
 
         // Clear un-applied styles
