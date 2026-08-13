@@ -3470,13 +3470,6 @@ public class RichTextState internal constructor(
             index = richParagraphList.lastIndex
 
         val selectedParagraph = richParagraphList.getOrNull(index) ?: return
-        val nextParagraph = richParagraphList.getOrNull(index + 1)
-        val nextParagraphStart =
-            if (nextParagraph == null)
-                null
-            else
-                (nextParagraph.getFirstNonEmptyChild() ?: nextParagraph.type.startRichSpan)
-                    .textRange.min.minus(nextParagraph.type.startText.length)
         val selectionAtParagraphStart =
             if (!selection.collapsed)
                 false
@@ -3489,37 +3482,33 @@ public class RichTextState internal constructor(
                             paragraph.getFirstNonEmptyChild() ?: paragraph.type.startRichSpan
                         firstChild.textRange.min - paragraph.type.startText.length == selection.min
                     }
-        val paragraphStartX =
+        val paragraphStartHitBounds =
             if (selectionAtParagraphStart)
-                textLayoutResult.getHorizontalPosition(
-                    offset = selection.min.coerceIn(0, textLength),
-                    usePrimaryDirection = true,
-                )
+                selection.min.coerceIn(0, textLength).let { offset ->
+                    val lineIndex = textLayoutResult.getLineForOffset(offset)
+                    val lineHeight =
+                        textLayoutResult.getLineBottom(lineIndex) -
+                            textLayoutResult.getLineTop(lineIndex)
+                    val startX = textLayoutResult.getHorizontalPosition(
+                        offset = offset,
+                        usePrimaryDirection = true,
+                    )
+
+                    startX..(startX + max(2f, lineHeight * 0.5f))
+                }
             else
-                0f
+                null
 
         // Handle selection adjustments
         if (
-            selection.collapsed &&
-            selection.min == nextParagraphStart
-        ) {
-            updateTextFieldValue(
-                textFieldValue.copy(
-                    selection = TextRange(
-                        (selection.min - 1).coerceAtLeast(0),
-                        (selection.min - 1).coerceAtLeast(0)
-                    )
-                )
-            )
-        } else if (
             selectionAtParagraphStart &&
-            pressX > paragraphStartX + 2f
+            paragraphStartHitBounds != null &&
+            pressX > paragraphStartHitBounds.endInclusive
         ) {
             // The legacy BasicTextField can report the next paragraph start when the user taps
-            // after the previous line's last character. The vertical press coordinate does not
-            // include the field's internal scroll offset, so the paragraph lookup above becomes
-            // unreliable after scrolling. The horizontal position still distinguishes that tap
-            // from an intentional tap at the beginning of the next paragraph.
+            // after the previous line's last character. Keep taps within half a line-height of the
+            // next paragraph's text origin at the paragraph start; only taps clearly past that
+            // hit area are corrected to the previous line end.
             updateTextFieldValue(
                 textFieldValue.copy(
                     selection = TextRange(
