@@ -1624,8 +1624,16 @@ public class RichTextState internal constructor(
             tempTextFieldValue.text == textFieldValue.text &&
             tempTextFieldValue.selection != textFieldValue.selection
         ) {
-            // Update selection
-            textFieldValue = tempTextFieldValue
+            // Background colors are masked under the live selection so the system
+            // selection highlight remains visible. Rebuild when that mask changes.
+            val maskAffected =
+                (!textFieldValue.selection.collapsed || !tempTextFieldValue.selection.collapsed) &&
+                    treeHasBackgroundSpans()
+            if (maskAffected) {
+                updateAnnotatedString(tempTextFieldValue)
+            } else {
+                textFieldValue = tempTextFieldValue
+            }
         } else {
             // Update the annotatedString and the textFieldValue with the new values
             updateAnnotatedString(tempTextFieldValue)
@@ -1649,6 +1657,18 @@ public class RichTextState internal constructor(
 
         // Clear [tempTextFieldValue]
         tempTextFieldValue = TextFieldValue()
+    }
+
+    private fun treeHasBackgroundSpans(): Boolean {
+        fun spanHasBackground(richSpan: RichSpan): Boolean {
+            if (richSpan.spanStyle.background.isSpecified) return true
+            if (richSpan.richSpanStyle.spanStyle(config).background.isSpecified) return true
+            return richSpan.children.any { spanHasBackground(it) }
+        }
+
+        return richParagraphList.any { paragraph ->
+            paragraph.children.any { spanHasBackground(it) }
+        }
     }
 
     /**
